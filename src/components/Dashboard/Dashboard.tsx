@@ -37,7 +37,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fichas, pedidos }) => {
       change: `+${fichasActivas.length}`,
       changeType: 'increase' as const,
       icon: FileText,
-      color: 'blue'
+      color: 'blue' as const
     },
     {
       title: 'En Producción',
@@ -45,7 +45,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fichas, pedidos }) => {
       change: `+${fichasEnProduccion.length}`,
       changeType: 'increase' as const,
       icon: Factory,
-      color: 'purple'
+      color: 'purple' as const
     },
     {
       title: 'Completadas Hoy',
@@ -53,7 +53,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fichas, pedidos }) => {
       change: `+${fichasCompletadasHoy.length}`,
       changeType: 'increase' as const,
       icon: CheckCircle,
-      color: 'green'
+      color: 'green' as const
     },
     {
       title: 'Pedidos Pendientes',
@@ -61,7 +61,7 @@ const Dashboard: React.FC<DashboardProps> = ({ fichas, pedidos }) => {
       change: `${pedidosPendientes.length} esperando`,
       changeType: 'increase' as const,
       icon: Package,
-      color: 'orange'
+      color: 'orange' as const
     }
   ];
 
