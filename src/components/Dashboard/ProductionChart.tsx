@@ -1,16 +1,35 @@
 import React from 'react';
 import { BarChart3 } from 'lucide-react';
+import { FichaTecnica } from '../../types';
 
-const ProductionChart: React.FC = () => {
-  const data = [
-    { area: 'Extrusión', completed: 15, pending: 3 },
-    { area: 'Corte', completed: 12, pending: 5 },
-    { area: 'Laminado', completed: 18, pending: 2 },
-    { area: 'Sellado', completed: 10, pending: 7 },
-    { area: 'Impresión', completed: 14, pending: 4 }
+interface ProductionChartProps {
+  fichas: FichaTecnica[];
+}
+
+const ProductionChart: React.FC<ProductionChartProps> = ({ fichas }) => {
+  const areas = [
+    { id: 'extrusion', name: 'Extrusión', estado: 'en_extrusion' },
+    { id: 'corte', name: 'Corte', estado: 'en_corte' },
+    { id: 'laminado', name: 'Laminado', estado: 'en_laminado' },
+    { id: 'sellado', name: 'Sellado', estado: 'en_sellado' },
+    { id: 'impresion', name: 'Impresión', estado: 'en_impresion' }
   ];
 
-  const maxValue = Math.max(...data.map(d => d.completed + d.pending));
+  const data = areas.map(area => {
+    const fichasArea = fichas.filter(f => f.estado === area.estado);
+    const completedToday = fichas.filter(f => {
+      const today = new Date().toDateString();
+      return f.estado === 'completada' && new Date(f.fechaCreacion).toDateString() === today;
+    });
+
+    return {
+      area: area.name,
+      completed: completedToday.length,
+      pending: fichasArea.length
+    };
+  });
+
+  const maxValue = Math.max(...data.map(d => d.completed + d.pending), 1);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -26,11 +45,11 @@ const ProductionChart: React.FC = () => {
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span className="text-gray-600">Pendientes</span>
+            <span className="text-gray-600">En Proceso</span>
           </div>
         </div>
       </div>
-      
+
       <div className="space-y-4">
         {data.map((item, index) => (
           <div key={index} className="space-y-2">
@@ -41,18 +60,18 @@ const ProductionChart: React.FC = () => {
               </span>
             </div>
             <div className="flex h-6 bg-gray-100 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="bg-green-500 transition-all duration-300"
-                style={{ width: `${(item.completed / maxValue) * 100}%` }}
+                style={{ width: `${maxValue > 0 ? (item.completed / maxValue) * 100 : 0}%` }}
               ></div>
-              <div 
+              <div
                 className="bg-blue-500 transition-all duration-300"
-                style={{ width: `${(item.pending / maxValue) * 100}%` }}
+                style={{ width: `${maxValue > 0 ? (item.pending / maxValue) * 100 : 0}%` }}
               ></div>
             </div>
             <div className="flex justify-between text-xs text-gray-500">
               <span>{item.completed} completadas</span>
-              <span>{item.pending} pendientes</span>
+              <span>{item.pending} en proceso</span>
             </div>
           </div>
         ))}

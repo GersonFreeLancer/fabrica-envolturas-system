@@ -1,45 +1,52 @@
 import React from 'react';
-import { Clock, User, FileText, CheckCircle } from 'lucide-react';
+import { Clock, User, FileText, CheckCircle, Factory } from 'lucide-react';
+import { FichaTecnica } from '../../types';
+import { formatDateTime } from '../../utils/formatters';
 
-const RecentActivity: React.FC = () => {
-  const activities = [
-    {
-      id: 1,
-      type: 'ficha_creada',
-      description: 'Nueva ficha técnica FT-2024-003 creada',
-      user: 'Carlos Mendoza',
-      time: 'hace 5 min',
-      icon: FileText,
-      color: 'blue'
-    },
-    {
-      id: 2,
-      type: 'proceso_completado',
-      description: 'Proceso de extrusión completado para FT-2024-001',
-      user: 'Ana García',
-      time: 'hace 15 min',
-      icon: CheckCircle,
-      color: 'green'
-    },
-    {
-      id: 3,
-      type: 'usuario_asignado',
-      description: 'Luis Rodríguez asignado a área de corte',
-      user: 'Sistema',
-      time: 'hace 32 min',
-      icon: User,
-      color: 'purple'
-    },
-    {
-      id: 4,
-      type: 'ficha_actualizada',
-      description: 'Parámetros actualizados en FT-2024-002',
-      user: 'María Torres',
-      time: 'hace 1h',
-      icon: FileText,
-      color: 'orange'
-    }
-  ];
+interface RecentActivityProps {
+  fichas: FichaTecnica[];
+}
+
+const RecentActivity: React.FC<RecentActivityProps> = ({ fichas }) => {
+  // Simular actividad reciente basada en las fichas
+  const activities = fichas.slice(0, 4).map((ficha, index) => {
+    const activityTypes = [
+      {
+        type: 'ficha_creada',
+        description: `Nueva ficha técnica ${ficha.numeroFicha} creada`,
+        user: 'Jefe de Producción',
+        icon: FileText,
+        color: 'blue'
+      },
+      {
+        type: 'proceso_completado',
+        description: `Proceso completado para ${ficha.numeroFicha}`,
+        user: 'Operario',
+        icon: CheckCircle,
+        color: 'green'
+      },
+      {
+        type: 'area_asignada',
+        description: `${ficha.numeroFicha} asignada a área`,
+        user: 'Sistema',
+        icon: Factory,
+        color: 'purple'
+      },
+      {
+        type: 'ficha_actualizada',
+        description: `Parámetros actualizados en ${ficha.numeroFicha}`,
+        user: 'Operario',
+        icon: User,
+        color: 'orange'
+      }
+    ];
+
+    return {
+      id: ficha.id,
+      ...activityTypes[index % activityTypes.length],
+      time: formatDateTime(ficha.fechaCreacion)
+    };
+  });
 
   const colorClasses = {
     blue: 'bg-blue-100 text-blue-600',
@@ -54,7 +61,7 @@ const RecentActivity: React.FC = () => {
         <Clock className="w-5 h-5 text-gray-600" />
         <h3 className="text-lg font-semibold text-gray-900">Actividad Reciente</h3>
       </div>
-      
+
       <div className="space-y-4">
         {activities.map((activity) => {
           const Icon = activity.icon;
@@ -76,7 +83,7 @@ const RecentActivity: React.FC = () => {
           );
         })}
       </div>
-      
+
       <button className="w-full mt-4 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
         Ver toda la actividad
       </button>

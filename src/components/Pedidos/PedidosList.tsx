@@ -1,52 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Eye, Edit, Package } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, Package, FileText, ArrowRight } from 'lucide-react';
 import { pedidosService } from '../../services/api';
 import { formatDate, getEstadoColor, getEstadoLabel } from '../../utils/formatters';
 import PedidoForm from './PedidoForm';
 
-const PedidosList: React.FC = () => {
-  const [pedidos, setPedidos] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PedidosListProps {
+  pedidos: any[];
+  onCreateFicha: (pedidoId: number) => void;
+  onRefresh: () => void;
+}
+
+const PedidosList: React.FC<PedidosListProps> = ({ pedidos, onCreateFicha, onRefresh }) => {
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('todos');
   const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => {
-    loadPedidos();
-  }, []);
-
-  const loadPedidos = async () => {
-    try {
-      const data = await pedidosService.getAll();
-      setPedidos(data);
-    } catch (error) {
-      console.error('Error cargando pedidos:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const filteredPedidos = pedidos.filter(pedido => {
     const matchesSearch = pedido.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         pedido.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+      pedido.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterEstado === 'todos' || pedido.estado === filterEstado;
     return matchesSearch && matchesFilter;
   });
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  const handleCreateFicha = async (pedidoId: number) => {
+    try {
+      setLoading(true);
+      // Aquí podrías navegar directamente al formulario de ficha con el pedido preseleccionado
+      onCreateFicha(pedidoId);
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (showForm) {
     return (
       <PedidoForm
         onSave={() => {
           setShowForm(false);
-          loadPedidos();
+          onRefresh();
         }}
         onCancel={() => setShowForm(false)}
       />
@@ -58,7 +52,7 @@ const PedidosList: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Gestión de Pedidos</h1>
-          <p className="text-gray-600 mt-1">Administra los pedidos de clientes</p>
+          <p className="text-gray-600 mt-1">Administra los pedidos de clientes y crea fichas técnicas</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -98,6 +92,51 @@ const PedidosList: React.FC = () => {
         </div>
       </div>
 
+      {/* Estadísticas rápidas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-yellow-100 text-yellow-600 rounded-lg">
+              <Package className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Pedidos Pendientes</p>
+              <p className="text-xl font-bold text-gray-900">
+                {pedidos.filter(p => p.estado === 'pendiente').length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">En Proceso</p>
+              <p className="text-xl font-bold text-gray-900">
+                {pedidos.filter(p => p.estado === 'en_proceso').length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-green-100 text-green-600 rounded-lg">
+              <Package className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Completados</p>
+              <p className="text-xl font-bold text-gray-900">
+                {pedidos.filter(p => p.estado === 'completado').length}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Pedidos Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
@@ -124,7 +163,7 @@ const PedidosList: React.FC = () => {
                   </td>
                   <td className="py-4 px-4">
                     <p className="font-medium text-gray-900">{pedido.descripcion}</p>
-                    <p className="text-sm text-gray-500">{pedido.especificaciones}</p>
+                    <p className="text-sm text-gray-500 line-clamp-2">{pedido.especificaciones}</p>
                   </td>
                   <td className="py-4 px-4 text-sm text-gray-900">
                     {pedido.cantidad.toLocaleString()} und
@@ -142,10 +181,28 @@ const PedidosList: React.FC = () => {
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center justify-end space-x-2">
-                      <button className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Ver detalles">
+                      {pedido.estado === 'pendiente' && (
+                        <button
+                          onClick={() => handleCreateFicha(pedido.id)}
+                          disabled={loading}
+                          className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                          title="Crear ficha técnica"
+                        >
+                          <FileText className="w-3 h-3" />
+                          <span>Crear Ficha</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      )}
+                      <button
+                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Ver detalles"
+                      >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Editar">
+                      <button
+                        className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        title="Editar"
+                      >
                         <Edit className="w-4 h-4" />
                       </button>
                     </div>
@@ -155,7 +212,7 @@ const PedidosList: React.FC = () => {
             </tbody>
           </table>
         </div>
-        
+
         {filteredPedidos.length === 0 && (
           <div className="text-center py-12">
             <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
