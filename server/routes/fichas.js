@@ -100,9 +100,9 @@ router.post('/', authenticateToken, authorizeRoles('jefe_produccion'), async (re
       .input('material', sql.VarChar, especificaciones.material)
       .input('color', sql.VarChar, especificaciones.color)
       .input('acabado', sql.VarChar, especificaciones.acabado)
-      .input('largo', sql.Decimal(10,2), especificaciones.dimensiones.largo)
-      .input('ancho', sql.Decimal(10,2), especificaciones.dimensiones.ancho)
-      .input('grosor', sql.Decimal(10,3), especificaciones.dimensiones.grosor)
+      .input('largo', sql.Decimal(10, 2), especificaciones.dimensiones.largo)
+      .input('ancho', sql.Decimal(10, 2), especificaciones.dimensiones.ancho)
+      .input('grosor', sql.Decimal(10, 3), especificaciones.dimensiones.grosor)
       .input('cantidad_total', sql.Int, especificaciones.cantidadTotal)
       .input('observaciones', sql.Text, especificaciones.observaciones || '')
       .query(`
@@ -113,7 +113,7 @@ router.post('/', authenticateToken, authorizeRoles('jefe_produccion'), async (re
         OUTPUT INSERTED.id
         VALUES (
           @pedido_id, @numero_ficha, @jefe_produccion_id, @tipo_envoltura,
-          @material, @color, @acabado, @largo, @ancho, @grosor, @cantidad_total, @observaciones, 'creada'
+          @material, @color, @acabado, @largo, @ancho, @grosor, @cantidad_total, @observaciones, 'en_extrusion'
         )
       `);
 
@@ -138,19 +138,19 @@ router.post('/', authenticateToken, authorizeRoles('jefe_produccion'), async (re
 router.put('/:id/avance/:area', authenticateToken, async (req, res) => {
   try {
     const { id, area } = req.params;
-    const { parametrosProduccion, cantidadProcesada, tiempoOperacion, observaciones } = req.body;
+    const { parametrosProduccion, cantidadProcesada, tiempoOperacion, observaciones, derivarCalidad } = req.body;
     const operarioId = req.user.id;
 
     const pool = getPool();
-    
+
     // Insertar avance
     await pool.request()
       .input('ficha_tecnica_id', sql.Int, id)
       .input('area', sql.VarChar, area)
       .input('operario_id', sql.Int, operarioId)
-      .input('temperatura', sql.Decimal(8,2), parametrosProduccion.temperatura || null)
-      .input('presion', sql.Decimal(8,2), parametrosProduccion.presion || null)
-      .input('velocidad', sql.Decimal(8,2), parametrosProduccion.velocidad || null)
+      .input('temperatura', sql.Decimal(8, 2), parametrosProduccion.temperatura || null)
+      .input('presion', sql.Decimal(8, 2), parametrosProduccion.presion || null)
+      .input('velocidad', sql.Decimal(8, 2), parametrosProduccion.velocidad || null)
       .input('configuracion_maquina', sql.VarChar, parametrosProduccion.configuracionMaquina || null)
       .input('cantidad_procesada', sql.Int, cantidadProcesada)
       .input('tiempo_operacion', sql.Int, tiempoOperacion)
@@ -168,16 +168,22 @@ router.put('/:id/avance/:area', authenticateToken, async (req, res) => {
         )
       `);
 
-    // Actualizar estado de la ficha
-    const nextStates = {
-      'extrusion': 'en_corte',
-      'corte': 'en_laminado',
-      'laminado': 'en_sellado',
-      'sellado': 'en_impresion',
-      'impresion': 'control_calidad'
-    };
+    // Determinar siguiente estado
+    let nextState;
+    if (derivarCalidad && area === 'impresion') {
+      nextState = 'control_calidad';
+    } else {
+      const nextStates = {
+        'extrusion': 'en_corte',
+        'corte': 'en_laminado',
+        'laminado': 'en_sellado',
+        'sellado': 'en_impresion',
+        'impresion': 'completada'
+      };
+      nextState = nextStates[area];
+    }
 
-    const nextState = nextStates[area];
+    // Actualizar estado de la ficha
     if (nextState) {
       await pool.request()
         .input('id', sql.Int, id)
@@ -185,7 +191,7 @@ router.put('/:id/avance/:area', authenticateToken, async (req, res) => {
         .query('UPDATE FichasTecnicas SET estado = @estado WHERE id = @id');
     }
 
-    res.json({ message: 'Avance registrado exitosamente' });
+    res.json({ message: 'Avance registrado exitosamente', nextState });
 
   } catch (error) {
     console.error('Error registrando avance:', error);

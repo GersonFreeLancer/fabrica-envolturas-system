@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle, XCircle, AlertTriangle, FileText, User, Calendar } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, FileText, User, Calendar, Send } from 'lucide-react';
 import { FichaTecnica } from '../../types';
 import { formatDate, formatDateTime } from '../../utils/formatters';
 
@@ -7,9 +7,10 @@ interface CalidadViewProps {
     fichas: FichaTecnica[];
     currentUser: any;
     onUpdateFicha: () => void;
+    onCreateReport?: (fichaId: number, reportData: any) => void;
 }
 
-const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdateFicha }) => {
+const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdateFicha, onCreateReport }) => {
     const [selectedFicha, setSelectedFicha] = useState<FichaTecnica | null>(null);
     const [showInspectionForm, setShowInspectionForm] = useState(false);
 
@@ -60,7 +61,7 @@ const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdate
                             <XCircle className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-600">Rechazadas</p>
+                            <p className="text-sm text-gray-600">Con Observaciones</p>
                             <p className="text-xl font-bold text-gray-900">0</p>
                         </div>
                     </div>
@@ -142,6 +143,21 @@ const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdate
                     inspector={currentUser}
                     onSave={(result) => {
                         console.log('Resultado de inspección:', result);
+
+                        // Si hay observaciones, crear informe
+                        if (result.resultado === 'rechazado' || result.resultado === 'revision') {
+                            if (onCreateReport) {
+                                onCreateReport(selectedFicha.id, {
+                                    tipo: 'observacion_calidad',
+                                    resultado: result.resultado,
+                                    observaciones: result.observaciones,
+                                    defectos: result.defectosEncontrados,
+                                    inspector: currentUser.nombre,
+                                    fechaInspeccion: new Date().toISOString()
+                                });
+                            }
+                        }
+
                         setShowInspectionForm(false);
                         setSelectedFicha(null);
                         onUpdateFicha();
@@ -167,6 +183,7 @@ const InspectionModal: React.FC<{
     const [observaciones, setObservaciones] = useState('');
     const [defectos, setDefectos] = useState<string[]>([]);
     const [nuevoDefecto, setNuevoDefecto] = useState('');
+    const [areaObservada, setAreaObservada] = useState('');
 
     const defectosComunes = [
         'Dimensiones incorrectas',
@@ -175,7 +192,18 @@ const InspectionModal: React.FC<{
         'Grosor irregular',
         'Defectos de sellado',
         'Impresión borrosa',
-        'Material contaminado'
+        'Material contaminado',
+        'Temperatura inadecuada',
+        'Presión insuficiente',
+        'Velocidad incorrecta'
+    ];
+
+    const areas = [
+        'Extrusión',
+        'Corte',
+        'Laminado',
+        'Sellado',
+        'Impresión'
     ];
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -184,6 +212,7 @@ const InspectionModal: React.FC<{
             resultado,
             observaciones,
             defectosEncontrados: defectos,
+            areaObservada: (resultado === 'rechazado' || resultado === 'revision') ? areaObservada : null,
             fechaInspeccion: new Date().toISOString(),
             inspectorId: inspector.id
         });
@@ -247,8 +276,8 @@ const InspectionModal: React.FC<{
                                 type="button"
                                 onClick={() => setResultado('aprobado')}
                                 className={`p-3 rounded-lg border-2 transition-colors ${resultado === 'aprobado'
-                                    ? 'border-green-500 bg-green-50 text-green-700'
-                                    : 'border-gray-200 hover:border-green-300'
+                                        ? 'border-green-500 bg-green-50 text-green-700'
+                                        : 'border-gray-200 hover:border-green-300'
                                     }`}
                             >
                                 <CheckCircle className="w-5 h-5 mx-auto mb-1" />
@@ -259,8 +288,8 @@ const InspectionModal: React.FC<{
                                 type="button"
                                 onClick={() => setResultado('revision')}
                                 className={`p-3 rounded-lg border-2 transition-colors ${resultado === 'revision'
-                                    ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
-                                    : 'border-gray-200 hover:border-yellow-300'
+                                        ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
+                                        : 'border-gray-200 hover:border-yellow-300'
                                     }`}
                             >
                                 <AlertTriangle className="w-5 h-5 mx-auto mb-1" />
@@ -271,8 +300,8 @@ const InspectionModal: React.FC<{
                                 type="button"
                                 onClick={() => setResultado('rechazado')}
                                 className={`p-3 rounded-lg border-2 transition-colors ${resultado === 'rechazado'
-                                    ? 'border-red-500 bg-red-50 text-red-700'
-                                    : 'border-gray-200 hover:border-red-300'
+                                        ? 'border-red-500 bg-red-50 text-red-700'
+                                        : 'border-gray-200 hover:border-red-300'
                                     }`}
                             >
                                 <XCircle className="w-5 h-5 mx-auto mb-1" />
@@ -280,6 +309,26 @@ const InspectionModal: React.FC<{
                             </button>
                         </div>
                     </div>
+
+                    {/* Área Observada */}
+                    {(resultado === 'rechazado' || resultado === 'revision') && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Área con Observaciones
+                            </label>
+                            <select
+                                value={areaObservada}
+                                onChange={(e) => setAreaObservada(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required
+                            >
+                                <option value="">Seleccionar área...</option>
+                                {areas.map(area => (
+                                    <option key={area} value={area}>{area}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     {/* Defectos Encontrados */}
                     {(resultado === 'rechazado' || resultado === 'revision') && (
@@ -369,9 +418,10 @@ const InspectionModal: React.FC<{
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
-                            Guardar Inspección
+                            <Send className="w-4 h-4" />
+                            <span>Guardar Inspección</span>
                         </button>
                     </div>
                 </form>
