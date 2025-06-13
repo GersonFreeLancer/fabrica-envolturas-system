@@ -1,22 +1,54 @@
 import React, { useState } from 'react';
-import { BarChart3, FileText, Download, Calendar, TrendingUp, Package } from 'lucide-react';
+import { BarChart3, FileText, Download, Calendar, TrendingUp, Package, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { FichaTecnica } from '../../types';
-import { formatDate } from '../../utils/formatters';
+import { formatDate, formatDateTime } from '../../utils/formatters';
 
 interface InformesViewProps {
     fichas: FichaTecnica[];
+    reportes?: any[];
 }
 
-const InformesView: React.FC<InformesViewProps> = ({ fichas }) => {
+const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) => {
     const [selectedPeriod, setSelectedPeriod] = useState('mes');
     const [selectedReport, setSelectedReport] = useState('produccion');
+    const [activeTab, setActiveTab] = useState('reportes');
 
     // Calcular estadísticas
     const fichasCompletadas = fichas.filter(f => f.estado === 'completada');
     const fichasEnProceso = fichas.filter(f => f.estado.startsWith('en_'));
     const totalProduccion = fichasCompletadas.reduce((sum, f) => sum + f.especificaciones.cantidadTotal, 0);
 
-    const reportes = [
+    // Simular reportes de observaciones
+    const reportesObservaciones = [
+        {
+            id: 1,
+            fichaId: 1,
+            numeroFicha: 'FT-2024-001',
+            tipo: 'observacion_calidad',
+            area: 'Extrusión',
+            resultado: 'revision',
+            observaciones: 'Temperatura ligeramente elevada durante el proceso. Se recomienda ajustar a 175°C para próximas producciones.',
+            defectos: ['Temperatura inadecuada'],
+            inspector: 'Roberto Vega',
+            fechaCreacion: '2024-01-20T14:30:00Z',
+            estado: 'pendiente'
+        },
+        {
+            id: 2,
+            fichaId: 2,
+            numeroFicha: 'FT-2024-002',
+            tipo: 'observacion_calidad',
+            area: 'Sellado',
+            resultado: 'rechazado',
+            observaciones: 'Defectos en el sellado que comprometen la integridad del producto. Revisar configuración de máquina y presión aplicada.',
+            defectos: ['Defectos de sellado', 'Presión insuficiente'],
+            inspector: 'Roberto Vega',
+            fechaCreacion: '2024-01-21T09:15:00Z',
+            estado: 'atendido'
+        }
+    ];
+
+    const reportesTypes = [
         {
             id: 'produccion',
             titulo: 'Reporte de Producción',
@@ -52,7 +84,7 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas }) => {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Informes y Reportes</h1>
-                    <p className="text-gray-600 mt-1">Análisis y estadísticas de producción</p>
+                    <p className="text-gray-600 mt-1">Análisis, estadísticas y observaciones de producción</p>
                 </div>
                 <div className="flex items-center space-x-3">
                     <select
@@ -72,114 +104,238 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas }) => {
                 </div>
             </div>
 
-            {/* Estadísticas Generales */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center space-x-3">
-                        <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
-                            <FileText className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-600">Fichas Completadas</p>
-                            <p className="text-2xl font-bold text-gray-900">{fichasCompletadas.length}</p>
-                        </div>
-                    </div>
+            {/* Tabs */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div className="border-b border-gray-200">
+                    <nav className="flex space-x-8 px-6">
+                        <button
+                            onClick={() => setActiveTab('reportes')}
+                            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'reportes'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            <BarChart3 className="w-4 h-4 inline mr-2" />
+                            Reportes de Producción
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('observaciones')}
+                            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'observaciones'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            <AlertTriangle className="w-4 h-4 inline mr-2" />
+                            Informes de Observaciones
+                            {reportesObservaciones.filter(r => r.estado === 'pendiente').length > 0 && (
+                                <span className="ml-2 bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">
+                                    {reportesObservaciones.filter(r => r.estado === 'pendiente').length}
+                                </span>
+                            )}
+                        </button>
+                    </nav>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center space-x-3">
-                        <div className="p-3 bg-green-100 text-green-600 rounded-lg">
-                            <Package className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-600">Total Producido</p>
-                            <p className="text-2xl font-bold text-gray-900">{totalProduccion.toLocaleString()}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center space-x-3">
-                        <div className="p-3 bg-purple-100 text-purple-600 rounded-lg">
-                            <TrendingUp className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-600">En Proceso</p>
-                            <p className="text-2xl font-bold text-gray-900">{fichasEnProceso.length}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center space-x-3">
-                        <div className="p-3 bg-orange-100 text-orange-600 rounded-lg">
-                            <BarChart3 className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-600">Eficiencia</p>
-                            <p className="text-2xl font-bold text-gray-900">87%</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Tipos de Reportes */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Tipos de Reportes</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {reportes.map((reporte) => {
-                        const Icon = reporte.icon;
-                        return (
-                            <div
-                                key={reporte.id}
-                                className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${selectedReport === reporte.id
-                                    ? `border-${reporte.color}-500 bg-${reporte.color}-50`
-                                    : 'border-gray-200 hover:border-gray-300'
-                                    }`}
-                                onClick={() => setSelectedReport(reporte.id)}
-                            >
-                                <div className="flex items-center space-x-3">
-                                    <div className={`p-2 bg-${reporte.color}-100 text-${reporte.color}-600 rounded-lg`}>
-                                        <Icon className="w-5 h-5" />
+                <div className="p-6">
+                    {activeTab === 'reportes' && (
+                        <div className="space-y-6">
+                            {/* Estadísticas Generales */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <div className="bg-blue-50 rounded-xl p-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
+                                            <FileText className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">Fichas Completadas</p>
+                                            <p className="text-2xl font-bold text-gray-900">{fichasCompletadas.length}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h4 className="font-medium text-gray-900">{reporte.titulo}</h4>
-                                        <p className="text-sm text-gray-600">{reporte.descripcion}</p>
+                                </div>
+
+                                <div className="bg-green-50 rounded-xl p-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="p-3 bg-green-100 text-green-600 rounded-lg">
+                                            <Package className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">Total Producido</p>
+                                            <p className="text-2xl font-bold text-gray-900">{totalProduccion.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-purple-50 rounded-xl p-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="p-3 bg-purple-100 text-purple-600 rounded-lg">
+                                            <TrendingUp className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">En Proceso</p>
+                                            <p className="text-2xl font-bold text-gray-900">{fichasEnProceso.length}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-orange-50 rounded-xl p-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="p-3 bg-orange-100 text-orange-600 rounded-lg">
+                                            <BarChart3 className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">Eficiencia</p>
+                                            <p className="text-2xl font-bold text-gray-900">87%</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        );
-                    })}
+
+                            {/* Tipos de Reportes */}
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Tipos de Reportes</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {reportesTypes.map((reporte) => {
+                                        const Icon = reporte.icon;
+                                        return (
+                                            <div
+                                                key={reporte.id}
+                                                className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${selectedReport === reporte.id
+                                                        ? `border-${reporte.color}-500 bg-${reporte.color}-50`
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                    }`}
+                                                onClick={() => setSelectedReport(reporte.id)}
+                                            >
+                                                <div className="flex items-center space-x-3">
+                                                    <div className={`p-2 bg-${reporte.color}-100 text-${reporte.color}-600 rounded-lg`}>
+                                                        <Icon className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-medium text-gray-900">{reporte.titulo}</h4>
+                                                        <p className="text-sm text-gray-600">{reporte.descripcion}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Reporte Seleccionado */}
+                            <div>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-lg font-semibold text-gray-900">
+                                        {reportesTypes.find(r => r.id === selectedReport)?.titulo}
+                                    </h3>
+                                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                                        <Calendar className="w-4 h-4" />
+                                        <span>Período: {selectedPeriod}</span>
+                                    </div>
+                                </div>
+
+                                {selectedReport === 'produccion' && <ProductionReport fichas={fichas} />}
+                                {selectedReport === 'calidad' && <QualityReport fichas={fichas} />}
+                                {selectedReport === 'eficiencia' && <EfficiencyReport fichas={fichas} />}
+                                {selectedReport === 'inventario' && <InventoryReport fichas={fichas} />}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'observaciones' && (
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-semibold text-gray-900">Informes de Observaciones de Calidad</h3>
+                                <div className="flex items-center space-x-4 text-sm">
+                                    <div className="flex items-center space-x-2">
+                                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                                        <span>Pendiente</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                                        <span>Atendido</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {reportesObservaciones.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <CheckCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                                    <p className="text-gray-500">No hay informes de observaciones</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {reportesObservaciones.map((reporte) => (
+                                        <div key={reporte.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center space-x-3 mb-2">
+                                                        <span className="font-mono text-sm font-medium text-blue-600">
+                                                            {reporte.numeroFicha}
+                                                        </span>
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${reporte.resultado === 'rechazado' ? 'bg-red-100 text-red-800' :
+                                                                reporte.resultado === 'revision' ? 'bg-yellow-100 text-yellow-800' :
+                                                                    'bg-green-100 text-green-800'
+                                                            }`}>
+                                                            {reporte.resultado === 'rechazado' ? 'Rechazado' :
+                                                                reporte.resultado === 'revision' ? 'Requiere Revisión' : 'Aprobado'}
+                                                        </span>
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${reporte.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                                                            }`}>
+                                                            {reporte.estado === 'pendiente' ? 'Pendiente' : 'Atendido'}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                        <div>
+                                                            <p className="text-sm text-gray-600">Área observada:</p>
+                                                            <p className="font-medium text-gray-900">{reporte.area}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm text-gray-600">Inspector:</p>
+                                                            <p className="font-medium text-gray-900">{reporte.inspector}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm text-gray-600">Fecha de inspección:</p>
+                                                            <p className="font-medium text-gray-900">{formatDateTime(reporte.fechaCreacion)}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mb-4">
+                                                        <p className="text-sm text-gray-600 mb-1">Observaciones:</p>
+                                                        <p className="text-gray-900 bg-gray-50 p-3 rounded-lg text-sm">{reporte.observaciones}</p>
+                                                    </div>
+
+                                                    {reporte.defectos && reporte.defectos.length > 0 && (
+                                                        <div>
+                                                            <p className="text-sm text-gray-600 mb-2">Defectos encontrados:</p>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {reporte.defectos.map((defecto, index) => (
+                                                                    <span key={index} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+                                                                        {defecto}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center space-x-2 ml-4">
+                                                    {reporte.estado === 'pendiente' && (
+                                                        <button className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors">
+                                                            Marcar como Atendido
+                                                        </button>
+                                                    )}
+                                                    <button className="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">
+                                                        Ver Detalles
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
-            </div>
-
-            {/* Reporte Seleccionado */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                        {reportes.find(r => r.id === selectedReport)?.titulo}
-                    </h3>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                        <Calendar className="w-4 h-4" />
-                        <span>Período: {selectedPeriod}</span>
-                    </div>
-                </div>
-
-                {selectedReport === 'produccion' && (
-                    <ProductionReport fichas={fichas} />
-                )}
-
-                {selectedReport === 'calidad' && (
-                    <QualityReport fichas={fichas} />
-                )}
-
-                {selectedReport === 'eficiencia' && (
-                    <EfficiencyReport fichas={fichas} />
-                )}
-
-                {selectedReport === 'inventario' && (
-                    <InventoryReport fichas={fichas} />
-                )}
             </div>
         </div>
     );
