@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Eye, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, Trash2, Play, Clock } from 'lucide-react';
 import { FichaTecnica } from '../../types';
 import { formatDate, getEstadoColor, getEstadoLabel } from '../../utils/formatters';
 
@@ -8,23 +8,43 @@ interface FichasListProps {
   onCreateNew: () => void;
   onViewFicha: (ficha: FichaTecnica) => void;
   onEditFicha: (ficha: FichaTecnica) => void;
+  onProcessFicha: (ficha: FichaTecnica) => void;
+  currentUser: any;
 }
 
 const FichasList: React.FC<FichasListProps> = ({
   fichas,
   onCreateNew,
   onViewFicha,
-  onEditFicha
+  onEditFicha,
+  onProcessFicha,
+  currentUser
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('todos');
 
   const filteredFichas = fichas.filter(ficha => {
     const matchesSearch = ficha.numeroFicha.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ficha.pedido.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+      ficha.pedido.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterEstado === 'todos' || ficha.estado === filterEstado;
     return matchesSearch && matchesFilter;
   });
+
+  // Determinar si el usuario puede procesar una ficha específica
+  const canProcessFicha = (ficha: FichaTecnica) => {
+    const userAreaMap = {
+      'operario_extrusion': 'en_extrusion',
+      'operario_corte': 'en_corte',
+      'operario_laminado': 'en_laminado',
+      'operario_sellado': 'en_sellado',
+      'operario_impresion': 'en_impresion'
+    };
+
+    const userRequiredState = userAreaMap[currentUser?.rol as keyof typeof userAreaMap];
+    return userRequiredState && ficha.estado === userRequiredState;
+  };
+
+  const canCreateFicha = currentUser?.rol === 'jefe_produccion';
 
   return (
     <div className="p-6 space-y-6">
@@ -33,13 +53,15 @@ const FichasList: React.FC<FichasListProps> = ({
           <h1 className="text-3xl font-bold text-gray-900">Fichas Técnicas</h1>
           <p className="text-gray-600 mt-1">Gestión de fichas técnicas de producción</p>
         </div>
-        <button
-          onClick={onCreateNew}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nueva Ficha</span>
-        </button>
+        {canCreateFicha && (
+          <button
+            onClick={onCreateNew}
+            className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nueva Ficha</span>
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -75,6 +97,56 @@ const FichasList: React.FC<FichasListProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Mis Fichas Asignadas (para operarios) */}
+      {currentUser?.rol?.startsWith('operario_') && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+            <Clock className="w-5 h-5 text-blue-600" />
+            <span>Mis Fichas Asignadas</span>
+          </h3>
+
+          {filteredFichas.filter(canProcessFicha).length === 0 ? (
+            <div className="text-center py-8">
+              <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">No tienes fichas asignadas en este momento</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredFichas.filter(canProcessFicha).map((ficha) => (
+                <div key={ficha.id} className="border border-blue-200 bg-blue-50 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-mono text-sm font-medium text-blue-600">
+                      {ficha.numeroFicha}
+                    </span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoColor(ficha.estado)}`}>
+                      {getEstadoLabel(ficha.estado)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <p className="font-medium text-gray-900">{ficha.pedido.cliente.nombre}</p>
+                    <p className="text-gray-600">{ficha.especificaciones.tipoEnvoltura}</p>
+                    <p className="text-gray-500">
+                      Cantidad: {ficha.especificaciones.cantidadTotal.toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="mt-4">
+                    <button
+                      onClick={() => onProcessFicha(ficha)}
+                      className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors"
+                    >
+                      <Play className="w-4 h-4" />
+                      <span>Procesar Ficha</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Fichas Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -124,6 +196,16 @@ const FichasList: React.FC<FichasListProps> = ({
                   </td>
                   <td className="py-4 px-4">
                     <div className="flex items-center justify-end space-x-2">
+                      {canProcessFicha(ficha) && (
+                        <button
+                          onClick={() => onProcessFicha(ficha)}
+                          className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                          title="Procesar ficha"
+                        >
+                          <Play className="w-3 h-3" />
+                          <span>Procesar</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => onViewFicha(ficha)}
                         className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -131,16 +213,20 @@ const FichasList: React.FC<FichasListProps> = ({
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => onEditFicha(ficha)}
-                        className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Editar"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {canCreateFicha && (
+                        <>
+                          <button
+                            onClick={() => onEditFicha(ficha)}
+                            className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -148,7 +234,7 @@ const FichasList: React.FC<FichasListProps> = ({
             </tbody>
           </table>
         </div>
-        
+
         {filteredFichas.length === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-500">No se encontraron fichas técnicas</p>
