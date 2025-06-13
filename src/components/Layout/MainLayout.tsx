@@ -6,6 +6,7 @@ import Dashboard from '../Dashboard/Dashboard';
 import FichasList from '../FichasTecnicas/FichasList';
 import FichaForm from '../FichasTecnicas/FichaForm';
 import FichaDetail from '../FichasTecnicas/FichaDetail';
+import ProcessForm from '../FichasTecnicas/ProcessForm';
 import ProduccionView from '../Produccion/ProduccionView';
 import PedidosList from '../Pedidos/PedidosList';
 import CalidadView from '../Calidad/CalidadView';
@@ -22,7 +23,7 @@ const MainLayout: React.FC = () => {
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<'list' | 'form' | 'detail'>('list');
+  const [currentView, setCurrentView] = useState<'list' | 'form' | 'detail' | 'process'>('list');
   const [selectedFicha, setSelectedFicha] = useState<FichaTecnica | null>(null);
   const { user } = useAuth();
 
@@ -55,6 +56,19 @@ const MainLayout: React.FC = () => {
       setCurrentView('list');
     } catch (error) {
       console.error('Error creando ficha:', error);
+    }
+  };
+
+  const handleProcessFicha = async (data: any) => {
+    try {
+      if (!selectedFicha) return;
+
+      await fichasService.updateAvance(selectedFicha.id, data.area, data);
+      await loadData();
+      setCurrentView('list');
+      setSelectedFicha(null);
+    } catch (error) {
+      console.error('Error procesando ficha:', error);
     }
   };
 
@@ -106,9 +120,20 @@ const MainLayout: React.FC = () => {
                     onUpdateAvance={handleUpdateAvance}
                     currentUser={user}
                   />
+                ) : currentView === 'process' && selectedFicha ? (
+                  <ProcessForm
+                    ficha={selectedFicha}
+                    currentUser={user}
+                    onSave={handleProcessFicha}
+                    onCancel={() => {
+                      setCurrentView('list');
+                      setSelectedFicha(null);
+                    }}
+                  />
                 ) : (
                   <FichasList
                     fichas={fichas}
+                    currentUser={user}
                     onCreateNew={() => setCurrentView('form')}
                     onViewFicha={(ficha) => {
                       setSelectedFicha(ficha);
@@ -117,6 +142,10 @@ const MainLayout: React.FC = () => {
                     onEditFicha={(ficha) => {
                       setSelectedFicha(ficha);
                       setCurrentView('detail');
+                    }}
+                    onProcessFicha={(ficha) => {
+                      setSelectedFicha(ficha);
+                      setCurrentView('process');
                     }}
                   />
                 )
