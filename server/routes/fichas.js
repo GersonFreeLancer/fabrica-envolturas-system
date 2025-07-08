@@ -143,15 +143,14 @@ router.put('/:id/avance/:area', authenticateToken, async (req, res) => {
 
     const pool = getPool();
 
-    // Insertar avance
+    // Insertar avance con parámetros específicos por área
+    const parametrosJson = JSON.stringify(parametrosProduccion);
+
     await pool.request()
       .input('ficha_tecnica_id', sql.Int, id)
       .input('area', sql.VarChar, area)
       .input('operario_id', sql.Int, operarioId)
-      .input('temperatura', sql.Decimal(8, 2), parametrosProduccion.temperatura || null)
-      .input('presion', sql.Decimal(8, 2), parametrosProduccion.presion || null)
-      .input('velocidad', sql.Decimal(8, 2), parametrosProduccion.velocidad || null)
-      .input('configuracion_maquina', sql.VarChar, parametrosProduccion.configuracionMaquina || null)
+      .input('parametros_json', sql.Text, parametrosJson)
       .input('cantidad_procesada', sql.Int, cantidadProcesada)
       .input('tiempo_operacion', sql.Int, tiempoOperacion)
       .input('observaciones', sql.Text, observaciones || '')
@@ -163,7 +162,7 @@ router.put('/:id/avance/:area', authenticateToken, async (req, res) => {
         )
         VALUES (
           @ficha_tecnica_id, @area, @operario_id, GETDATE(), GETDATE(),
-          @temperatura, @presion, @velocidad, @configuracion_maquina,
+          NULL, NULL, NULL, @parametros_json,
           @cantidad_procesada, @tiempo_operacion, @observaciones, 'completado'
         )
       `);
@@ -195,6 +194,52 @@ router.put('/:id/avance/:area', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Error registrando avance:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Obtener avances de una ficha específica
+router.get('/:id/avances', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = getPool();
+
+    const result = await pool.request()
+      .input('ficha_id', sql.Int, id)
+      .query(`
+        SELECT 
+          apa.id,
+          apa.area,
+          apa.fecha_inicio,
+          apa.fecha_fin,
+          apa.configuracion_maquina as parametros_json,
+          apa.cantidad_procesada,
+          apa.tiempo_operacion,
+          apa.observaciones,
+          apa.estado,
+          u.nombre as operario_nombre
+        FROM AvancesPorArea apa
+        INNER JOIN Usuarios u ON apa.operario_id = u.id
+        WHERE apa.ficha_tecnica_id = @ficha_id
+        ORDER BY apa.fecha_inicio
+      `);
+
+    const avances = result.recordset.map(row => ({
+      id: row.id,
+      area: row.area,
+      operario: row.operario_nombre,
+      fechaInicio: row.fecha_inicio,
+      fechaFin: row.fecha_fin,
+      parametros: row.parametros_json ? JSON.parse(row.parametros_json) : {},
+      cantidadProcesada: row.cantidad_procesada,
+      tiempoOperacion: row.tiempo_operacion,
+      observaciones: row.observaciones,
+      estado: row.estado
+    }));
+
+    res.json(avances);
+  } catch (error) {
+    console.error('Error obteniendo avances:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });

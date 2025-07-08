@@ -111,8 +111,8 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
                         <button
                             onClick={() => setActiveTab('reportes')}
                             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'reportes'
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             <BarChart3 className="w-4 h-4 inline mr-2" />
@@ -121,8 +121,8 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
                         <button
                             onClick={() => setActiveTab('observaciones')}
                             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'observaciones'
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             <AlertTriangle className="w-4 h-4 inline mr-2" />
@@ -200,8 +200,8 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
                                             <div
                                                 key={reporte.id}
                                                 className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${selectedReport === reporte.id
-                                                        ? `border-${reporte.color}-500 bg-${reporte.color}-50`
-                                                        : 'border-gray-200 hover:border-gray-300'
+                                                    ? `border-${reporte.color}-500 bg-${reporte.color}-50`
+                                                    : 'border-gray-200 hover:border-gray-300'
                                                     }`}
                                                 onClick={() => setSelectedReport(reporte.id)}
                                             >
@@ -272,8 +272,8 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
                                                             {reporte.numeroFicha}
                                                         </span>
                                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${reporte.resultado === 'rechazado' ? 'bg-red-100 text-red-800' :
-                                                                reporte.resultado === 'revision' ? 'bg-yellow-100 text-yellow-800' :
-                                                                    'bg-green-100 text-green-800'
+                                                            reporte.resultado === 'revision' ? 'bg-yellow-100 text-yellow-800' :
+                                                                'bg-green-100 text-green-800'
                                                             }`}>
                                                             {reporte.resultado === 'rechazado' ? 'Rechazado' :
                                                                 reporte.resultado === 'revision' ? 'Requiere Revisión' : 'Aprobado'}

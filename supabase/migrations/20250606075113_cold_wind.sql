@@ -127,8 +127,13 @@ INSERT INTO Pedidos (cliente_id, descripcion, cantidad, fecha_entrega, especific
 (2, 'Envolturas industriales resistentes', 3000, '2024-02-20', 'Polietileno reforzado, color azul'),
 (3, 'Envolturas premium para cosméticos', 2000, '2024-02-25', 'Acabado brillante, impresión personalizada');
 
+
+INSERT INTO Clientes (nombre, email, telefono, direccion) VALUES
+('Empresa Peru2', 'contacto@peru.com', '555-0001', 'Av. Lima')
+
 USE FabricaEnvolturas;
 GO
+
 
 
 select * from clientes
