@@ -36,6 +36,7 @@ export interface FichaTecnica {
   estado: 'creada' | 'en_extrusion' | 'en_corte' | 'en_laminado' | 'en_sellado' | 'en_impresion' | 'control_calidad' | 'completada';
   especificaciones: EspecificacionesProducto;
   avances: AvanceArea[];
+  inspeccionCalidad?: ControlCalidad;
 }
 
 export interface EspecificacionesProducto {
@@ -90,7 +91,26 @@ export interface ControlCalidad {
   id: number;
   fechaInspeccion: string;
   inspectorId: number;
+  inspectorNombre: string;
   resultado: 'aprobado' | 'rechazado' | 'revision';
   observaciones: string;
   defectosEncontrados?: string[];
+  areaObservada?: string;
+}
+
+export interface ReporteObservacion {
+  id: number;
+  fichaId: number;
+  numeroFicha: string;
+  tipo: 'observacion_calidad';
+  area: string;
+  resultado: 'aprobado' | 'rechazado' | 'revision';
+  observaciones: string;
+  defectos: string[];
+  inspector: string;
+  fechaCreacion: string;
+  estado: 'pendiente' | 'atendido';
+  accionCorrectiva?: string;
+  fechaCorreccion?: string;
+  responsableCorreccion?: string;
 }
