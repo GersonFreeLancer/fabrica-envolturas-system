@@ -23,6 +23,7 @@ router.get('/', authenticateToken, async (req, res) => {
         ft.grosor,
         ft.cantidad_total,
         ft.observaciones,
+        ft.inspeccion_calidad,
         p.id as pedido_id,
         p.descripcion as pedido_descripcion,
         p.cantidad as pedido_cantidad,
@@ -70,6 +71,7 @@ router.get('/', authenticateToken, async (req, res) => {
           email: row.cliente_email
         }
       },
+      inspeccionCalidad: row.inspeccion_calidad ? JSON.parse(row.inspeccion_calidad) : null,
       avances: []
     }));
 
@@ -194,6 +196,72 @@ router.put('/:id/avance/:area', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Error registrando avance:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Registrar inspección de calidad (solo una vez)
+router.put('/:id/inspeccion-calidad', authenticateToken, authorizeRoles('control_calidad', 'jefe_produccion'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { resultado, observaciones, defectosEncontrados, areaObservada } = req.body;
+    const inspectorId = req.user.id;
+    const inspectorNombre = req.user.nombre;
+
+    const pool = getPool();
+
+    // Verificar que la ficha no haya sido inspeccionada ya
+    const fichaResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT inspeccion_calidad FROM FichasTecnicas WHERE id = @id');
+
+    if (fichaResult.recordset[0].inspeccion_calidad) {
+      return res.status(400).json({ error: 'Esta ficha ya ha sido inspeccionada y no se puede modificar' });
+    }
+
+    // Crear objeto de inspección
+    const inspeccionData = {
+      inspectorId,
+      inspectorNombre,
+      fechaInspeccion: new Date().toISOString(),
+      resultado,
+      observaciones,
+      defectosEncontrados: defectosEncontrados || [],
+      areaObservada: areaObservada || null
+    };
+
+    // Actualizar la ficha con la inspección
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('inspeccion_calidad', sql.Text, JSON.stringify(inspeccionData))
+      .input('estado', sql.VarChar, resultado === 'aprobado' ? 'completada' : 'control_calidad')
+      .query(`
+        UPDATE FichasTecnicas 
+        SET inspeccion_calidad = @inspeccion_calidad, estado = @estado 
+        WHERE id = @id
+      `);
+
+    // Si es rechazado o requiere revisión, actualizar estado del pedido
+    if (resultado !== 'aprobado') {
+      const pedidoResult = await pool.request()
+        .input('ficha_id', sql.Int, id)
+        .query('SELECT pedido_id FROM FichasTecnicas WHERE id = @ficha_id');
+
+      if (pedidoResult.recordset.length > 0) {
+        await pool.request()
+          .input('pedido_id', sql.Int, pedidoResult.recordset[0].pedido_id)
+          .query('UPDATE Pedidos SET estado = \'en_proceso\' WHERE id = @pedido_id');
+      }
+    }
+
+    res.json({
+      message: 'Inspección de calidad registrada exitosamente',
+      resultado,
+      estado: resultado === 'aprobado' ? 'completada' : 'control_calidad'
+    });
+
+  } catch (error) {
+    console.error('Error registrando inspección de calidad:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
