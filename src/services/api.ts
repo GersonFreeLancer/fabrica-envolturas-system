@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://fabrica-envolturas-system-production.up.railway.app/api';
 
 // Crear instancia de axios con configuración base
 const api = axios.create({
