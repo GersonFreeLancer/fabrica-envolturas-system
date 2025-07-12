@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { connectDB } from './config/database.js';
+import { runMigrations } from '../scripts/run-migrations.js';
 
 // Importar rutas
 import authRoutes from './routes/auth.js';
@@ -32,8 +33,27 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Conectar a la base de datos
-connectDB().catch(console.error);
+// Conectar a la base de datos y ejecutar migraciones
+async function initializeDatabase() {
+  try {
+    await connectDB();
+    console.log('✅ Base de datos conectada');
+    
+    // Ejecutar migraciones solo en producción o si se especifica
+    if (process.env.NODE_ENV === 'production' || process.env.RUN_MIGRATIONS === 'true') {
+      console.log('🔄 Ejecutando migraciones...');
+      await runMigrations();
+      console.log('✅ Migraciones completadas');
+    } else {
+      console.log('⏭️ Saltando migraciones (desarrollo)');
+    }
+  } catch (error) {
+    console.error('❌ Error inicializando base de datos:', error);
+    throw error;
+  }
+}
+
+initializeDatabase();
 
 // Rutas de API
 app.use('/api/auth', authRoutes);
