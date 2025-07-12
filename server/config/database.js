@@ -1,23 +1,19 @@
-import sql from 'mssql';
+import pkg from 'pg';
+const { Pool } = pkg;
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const config = {
-  server: process.env.DB_SERVER,
+  host: process.env.DB_HOST || process.env.DB_SERVER,
   database: process.env.DB_DATABASE,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT),
-  options: {
-    encrypt: false, // Para desarrollo local
-    trustServerCertificate: true
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
-  }
+  port: parseInt(process.env.DB_PORT) || 5432,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 };
 
 let pool;
@@ -25,8 +21,12 @@ let pool;
 export const connectDB = async () => {
   try {
     if (!pool) {
-      pool = await sql.connect(config);
-      console.log('✅ Conectado a SQL Server');
+      pool = new Pool(config);
+      
+      // Probar la conexión
+      const client = await pool.connect();
+      console.log('✅ Conectado a PostgreSQL');
+      client.release();
     }
     return pool;
   } catch (error) {
@@ -42,4 +42,4 @@ export const getPool = () => {
   return pool;
 };
 
-export { sql };
+export { Pool };

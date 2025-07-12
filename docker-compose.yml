@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=fabrica_envolturas
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=YourStrong@Passw0rd
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations/20250101000000_postgresql_schema.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+
+  # Aplicación principal
+  app:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=db
+      - DB_DATABASE=fabrica_envolturas
+      - DB_USER=postgres
+      - DB_PASSWORD=YourStrong@Passw0rd
+      - DB_PORT=5432
+      - JWT_SECRET=your_super_secret_jwt_key_here
+      - CORS_ORIGIN=http://localhost:3000
+    depends_on:
+      - db
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, FileText, Download, Calendar, TrendingUp, Package, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { BarChart3, FileText, Download, Calendar, TrendingUp, Package, AlertTriangle, CheckCircle, XCircle, Edit, Save, X } from 'lucide-react';
 import { FichaTecnica } from '../../types';
 import { formatDate, formatDateTime } from '../../utils/formatters';
 
@@ -12,14 +12,8 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
     const [selectedPeriod, setSelectedPeriod] = useState('mes');
     const [selectedReport, setSelectedReport] = useState('produccion');
     const [activeTab, setActiveTab] = useState('reportes');
-
-    // Calcular estadísticas
-    const fichasCompletadas = fichas.filter(f => f.estado === 'completada');
-    const fichasEnProceso = fichas.filter(f => f.estado.startsWith('en_'));
-    const totalProduccion = fichasCompletadas.reduce((sum, f) => sum + f.especificaciones.cantidadTotal, 0);
-
-    // Simular reportes de observaciones
-    const reportesObservaciones = [
+    const [editingReport, setEditingReport] = useState<number | null>(null);
+    const [reportesObservaciones, setReportesObservaciones] = useState([
         {
             id: 1,
             fichaId: 1,
@@ -31,7 +25,10 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
             defectos: ['Temperatura inadecuada'],
             inspector: 'Roberto Vega',
             fechaCreacion: '2024-01-20T14:30:00Z',
-            estado: 'pendiente'
+            estado: 'pendiente',
+            accionCorrectiva: '',
+            fechaCorreccion: null,
+            responsableCorreccion: ''
         },
         {
             id: 2,
@@ -44,9 +41,17 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
             defectos: ['Defectos de sellado', 'Presión insuficiente'],
             inspector: 'Roberto Vega',
             fechaCreacion: '2024-01-21T09:15:00Z',
-            estado: 'atendido'
+            estado: 'atendido',
+            accionCorrectiva: 'Se ajustó la presión de sellado a 5.2 bar y se recalibró la máquina. Se realizaron pruebas de sellado con resultados satisfactorios.',
+            fechaCorreccion: '2024-01-22T10:30:00Z',
+            responsableCorreccion: 'Jorge Sánchez'
         }
-    ];
+    ]);
+
+    // Calcular estadísticas
+    const fichasCompletadas = fichas.filter(f => f.estado === 'completada');
+    const fichasEnProceso = fichas.filter(f => f.estado.startsWith('en_'));
+    const totalProduccion = fichasCompletadas.reduce((sum, f) => sum + f.especificaciones.cantidadTotal, 0);
 
     const reportesTypes = [
         {
@@ -78,6 +83,23 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
             color: 'orange'
         }
     ];
+
+    const handleMarcarAtendido = (reporteId: number, accionCorrectiva: string) => {
+        setReportesObservaciones(prev =>
+            prev.map(reporte =>
+                reporte.id === reporteId
+                    ? {
+                        ...reporte,
+                        estado: 'atendido',
+                        accionCorrectiva,
+                        fechaCorreccion: new Date().toISOString(),
+                        responsableCorreccion: 'Usuario Actual' // En una implementación real sería el usuario logueado
+                    }
+                    : reporte
+            )
+        );
+        setEditingReport(null);
+    };
 
     return (
         <div className="p-6 space-y-6">
@@ -297,6 +319,12 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
                                                             <p className="text-sm text-gray-600">Fecha de inspección:</p>
                                                             <p className="font-medium text-gray-900">{formatDateTime(reporte.fechaCreacion)}</p>
                                                         </div>
+                                                        {reporte.fechaCorreccion && (
+                                                            <div>
+                                                                <p className="text-sm text-gray-600">Fecha de corrección:</p>
+                                                                <p className="font-medium text-gray-900">{formatDateTime(reporte.fechaCorreccion)}</p>
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     <div className="mb-4">
@@ -305,7 +333,7 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
                                                     </div>
 
                                                     {reporte.defectos && reporte.defectos.length > 0 && (
-                                                        <div>
+                                                        <div className="mb-4">
                                                             <p className="text-sm text-gray-600 mb-2">Defectos encontrados:</p>
                                                             <div className="flex flex-wrap gap-2">
                                                                 {reporte.defectos.map((defecto, index) => (
@@ -316,12 +344,38 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
                                                             </div>
                                                         </div>
                                                     )}
+
+                                                    {/* Acción Correctiva */}
+                                                    {reporte.estado === 'atendido' && reporte.accionCorrectiva && (
+                                                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                                            <div className="flex items-center space-x-2 mb-2">
+                                                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                                                <p className="text-sm font-medium text-green-800">Acción Correctiva Implementada</p>
+                                                            </div>
+                                                            <p className="text-sm text-green-700 mb-2">{reporte.accionCorrectiva}</p>
+                                                            <p className="text-xs text-green-600">
+                                                                Responsable: {reporte.responsableCorreccion} | {formatDateTime(reporte.fechaCorreccion || '')}
+                                                            </p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Formulario de Acción Correctiva */}
+                                                    {editingReport === reporte.id && (
+                                                        <CorrectiveActionForm
+                                                            onSave={(accion) => handleMarcarAtendido(reporte.id, accion)}
+                                                            onCancel={() => setEditingReport(null)}
+                                                        />
+                                                    )}
                                                 </div>
 
                                                 <div className="flex items-center space-x-2 ml-4">
-                                                    {reporte.estado === 'pendiente' && (
-                                                        <button className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors">
-                                                            Marcar como Atendido
+                                                    {reporte.estado === 'pendiente' && editingReport !== reporte.id && (
+                                                        <button
+                                                            onClick={() => setEditingReport(reporte.id)}
+                                                            className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                                        >
+                                                            <Edit className="w-3 h-3" />
+                                                            <span>Atender</span>
                                                         </button>
                                                     )}
                                                     <button className="px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">
@@ -337,6 +391,54 @@ const InformesView: React.FC<InformesViewProps> = ({ fichas, reportes = [] }) =>
                     )}
                 </div>
             </div>
+        </div>
+    );
+};
+
+// Componente para el formulario de acción correctiva
+const CorrectiveActionForm: React.FC<{
+    onSave: (accion: string) => void;
+    onCancel: () => void;
+}> = ({ onSave, onCancel }) => {
+    const [accionCorrectiva, setAccionCorrectiva] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (accionCorrectiva.trim()) {
+            onSave(accionCorrectiva);
+        }
+    };
+
+    return (
+        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-medium text-blue-900 mb-3">Registrar Acción Correctiva</h4>
+            <form onSubmit={handleSubmit} className="space-y-3">
+                <textarea
+                    value={accionCorrectiva}
+                    onChange={(e) => setAccionCorrectiva(e.target.value)}
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Describe las acciones tomadas para corregir la observación..."
+                    required
+                />
+                <div className="flex items-center space-x-2">
+                    <button
+                        type="submit"
+                        className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <Save className="w-3 h-3" />
+                        <span>Guardar y Marcar como Atendido</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="flex items-center space-x-1 px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                        <X className="w-3 h-3" />
+                        <span>Cancelar</span>
+                    </button>
+                </div>
+            </form>
         </div>
     );
 };

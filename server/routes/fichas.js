@@ -1,5 +1,5 @@
 import express from 'express';
-import { getPool, sql } from '../config/database.js';
+import { getPool } from '../config/database.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const pool = getPool();
-    const result = await pool.request().query(`
+    const result = await pool.query(`
       SELECT 
         ft.id,
         ft.numero_ficha,
@@ -33,14 +33,14 @@ router.get('/', authenticateToken, async (req, res) => {
         c.nombre as cliente_nombre,
         c.email as cliente_email,
         u.nombre as jefe_nombre
-      FROM FichasTecnicas ft
-      INNER JOIN Pedidos p ON ft.pedido_id = p.id
-      INNER JOIN Clientes c ON p.cliente_id = c.id
-      INNER JOIN Usuarios u ON ft.jefe_produccion_id = u.id
+      FROM fichas_tecnicas ft
+      INNER JOIN pedidos p ON ft.pedido_id = p.id
+      INNER JOIN clientes c ON p.cliente_id = c.id
+      INNER JOIN usuarios u ON ft.jefe_produccion_id = u.id
       ORDER BY ft.fecha_creacion DESC
     `);
 
-    const fichas = result.recordset.map(row => ({
+    const fichas = result.rows.map(row => ({
       id: row.id,
       numeroFicha: row.numero_ficha,
       fechaCreacion: row.fecha_creacion,
@@ -71,7 +71,7 @@ router.get('/', authenticateToken, async (req, res) => {
           email: row.cliente_email
         }
       },
-      inspeccionCalidad: row.inspeccion_calidad ? JSON.parse(row.inspeccion_calidad) : null,
+      inspeccionCalidad: row.inspeccion_calidad,
       avances: []
     }));
 
@@ -94,39 +94,31 @@ router.post('/', authenticateToken, authorizeRoles('jefe_produccion'), async (re
     const numeroFicha = `FT-${year}-${timestamp}`;
 
     const pool = getPool();
-    const result = await pool.request()
-      .input('pedido_id', sql.Int, pedidoId)
-      .input('numero_ficha', sql.VarChar, numeroFicha)
-      .input('jefe_produccion_id', sql.Int, jefeId)
-      .input('tipo_envoltura', sql.VarChar, especificaciones.tipoEnvoltura)
-      .input('material', sql.VarChar, especificaciones.material)
-      .input('color', sql.VarChar, especificaciones.color)
-      .input('acabado', sql.VarChar, especificaciones.acabado)
-      .input('largo', sql.Decimal(10, 2), especificaciones.dimensiones.largo)
-      .input('ancho', sql.Decimal(10, 2), especificaciones.dimensiones.ancho)
-      .input('grosor', sql.Decimal(10, 3), especificaciones.dimensiones.grosor)
-      .input('cantidad_total', sql.Int, especificaciones.cantidadTotal)
-      .input('observaciones', sql.Text, especificaciones.observaciones || '')
-      .query(`
-        INSERT INTO FichasTecnicas (
-          pedido_id, numero_ficha, jefe_produccion_id, tipo_envoltura,
-          material, color, acabado, largo, ancho, grosor, cantidad_total, observaciones, estado
-        )
-        OUTPUT INSERTED.id
-        VALUES (
-          @pedido_id, @numero_ficha, @jefe_produccion_id, @tipo_envoltura,
-          @material, @color, @acabado, @largo, @ancho, @grosor, @cantidad_total, @observaciones, 'en_extrusion'
-        )
-      `);
+    const result = await pool.query(
+      `INSERT INTO fichas_tecnicas (
+        pedido_id, numero_ficha, jefe_produccion_id, tipo_envoltura,
+        material, color, acabado, largo, ancho, grosor, cantidad_total, observaciones, estado
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'en_extrusion')
+      RETURNING id`,
+      [
+        pedidoId, numeroFicha, jefeId, especificaciones.tipoEnvoltura,
+        especificaciones.material, especificaciones.color, especificaciones.acabado,
+        especificaciones.dimensiones.largo, especificaciones.dimensiones.ancho,
+        especificaciones.dimensiones.grosor, especificaciones.cantidadTotal,
+        especificaciones.observaciones || ''
+      ]
+    );
 
     // Actualizar estado del pedido
-    await pool.request()
-      .input('pedido_id', sql.Int, pedidoId)
-      .query('UPDATE Pedidos SET estado = \'en_proceso\' WHERE id = @pedido_id');
+    await pool.query(
+      'UPDATE pedidos SET estado = $1 WHERE id = $2',
+      ['en_proceso', pedidoId]
+    );
 
     res.status(201).json({
       message: 'Ficha técnica creada exitosamente',
-      fichaId: result.recordset[0].id,
+      fichaId: result.rows[0].id,
       numeroFicha
     });
 
@@ -148,26 +140,15 @@ router.put('/:id/avance/:area', authenticateToken, async (req, res) => {
     // Insertar avance con parámetros específicos por área
     const parametrosJson = JSON.stringify(parametrosProduccion);
 
-    await pool.request()
-      .input('ficha_tecnica_id', sql.Int, id)
-      .input('area', sql.VarChar, area)
-      .input('operario_id', sql.Int, operarioId)
-      .input('parametros_json', sql.Text, parametrosJson)
-      .input('cantidad_procesada', sql.Int, cantidadProcesada)
-      .input('tiempo_operacion', sql.Int, tiempoOperacion)
-      .input('observaciones', sql.Text, observaciones || '')
-      .query(`
-        INSERT INTO AvancesPorArea (
-          ficha_tecnica_id, area, operario_id, fecha_inicio, fecha_fin,
-          temperatura, presion, velocidad, configuracion_maquina,
-          cantidad_procesada, tiempo_operacion, observaciones, estado
-        )
-        VALUES (
-          @ficha_tecnica_id, @area, @operario_id, GETDATE(), GETDATE(),
-          NULL, NULL, NULL, @parametros_json,
-          @cantidad_procesada, @tiempo_operacion, @observaciones, 'completado'
-        )
-      `);
+    await pool.query(
+      `INSERT INTO avances_por_area (
+        ficha_tecnica_id, area, operario_id, fecha_inicio, fecha_fin,
+        temperatura, presion, velocidad, configuracion_maquina,
+        cantidad_procesada, tiempo_operacion, observaciones, estado
+      )
+      VALUES ($1, $2, $3, NOW(), NOW(), NULL, NULL, NULL, $4, $5, $6, $7, 'completado')`,
+      [id, area, operarioId, parametrosJson, cantidadProcesada, tiempoOperacion, observaciones || '']
+    );
 
     // Determinar siguiente estado
     let nextState;
@@ -186,10 +167,10 @@ router.put('/:id/avance/:area', authenticateToken, async (req, res) => {
 
     // Actualizar estado de la ficha
     if (nextState) {
-      await pool.request()
-        .input('id', sql.Int, id)
-        .input('estado', sql.VarChar, nextState)
-        .query('UPDATE FichasTecnicas SET estado = @estado WHERE id = @id');
+      await pool.query(
+        'UPDATE fichas_tecnicas SET estado = $1 WHERE id = $2',
+        [nextState, id]
+      );
     }
 
     res.json({ message: 'Avance registrado exitosamente', nextState });
@@ -201,7 +182,7 @@ router.put('/:id/avance/:area', authenticateToken, async (req, res) => {
 });
 
 // Registrar inspección de calidad (solo una vez)
-router.put('/:id/inspeccion-calidad', authenticateToken, authorizeRoles('control_calidad', 'jefe_produccion'), async (req, res) => {
+router.post('/:id/inspeccion-calidad', authenticateToken, authorizeRoles('control_calidad', 'jefe_produccion'), async (req, res) => {
   try {
     const { id } = req.params;
     const { resultado, observaciones, defectosEncontrados, areaObservada } = req.body;
@@ -211,11 +192,12 @@ router.put('/:id/inspeccion-calidad', authenticateToken, authorizeRoles('control
     const pool = getPool();
 
     // Verificar que la ficha no haya sido inspeccionada ya
-    const fichaResult = await pool.request()
-      .input('id', sql.Int, id)
-      .query('SELECT inspeccion_calidad FROM FichasTecnicas WHERE id = @id');
+    const fichaResult = await pool.query(
+      'SELECT inspeccion_calidad FROM fichas_tecnicas WHERE id = $1',
+      [id]
+    );
 
-    if (fichaResult.recordset[0].inspeccion_calidad) {
+    if (fichaResult.rows[0].inspeccion_calidad) {
       return res.status(400).json({ error: 'Esta ficha ya ha sido inspeccionada y no se puede modificar' });
     }
 
@@ -231,26 +213,25 @@ router.put('/:id/inspeccion-calidad', authenticateToken, authorizeRoles('control
     };
 
     // Actualizar la ficha con la inspección
-    await pool.request()
-      .input('id', sql.Int, id)
-      .input('inspeccion_calidad', sql.Text, JSON.stringify(inspeccionData))
-      .input('estado', sql.VarChar, resultado === 'aprobado' ? 'completada' : 'control_calidad')
-      .query(`
-        UPDATE FichasTecnicas 
-        SET inspeccion_calidad = @inspeccion_calidad, estado = @estado 
-        WHERE id = @id
-      `);
+    await pool.query(
+      `UPDATE fichas_tecnicas 
+       SET inspeccion_calidad = $1, estado = $2 
+       WHERE id = $3`,
+      [inspeccionData, resultado === 'aprobado' ? 'completada' : 'control_calidad', id]
+    );
 
     // Si es rechazado o requiere revisión, actualizar estado del pedido
     if (resultado !== 'aprobado') {
-      const pedidoResult = await pool.request()
-        .input('ficha_id', sql.Int, id)
-        .query('SELECT pedido_id FROM FichasTecnicas WHERE id = @ficha_id');
+      const pedidoResult = await pool.query(
+        'SELECT pedido_id FROM fichas_tecnicas WHERE id = $1',
+        [id]
+      );
 
-      if (pedidoResult.recordset.length > 0) {
-        await pool.request()
-          .input('pedido_id', sql.Int, pedidoResult.recordset[0].pedido_id)
-          .query('UPDATE Pedidos SET estado = \'en_proceso\' WHERE id = @pedido_id');
+      if (pedidoResult.rows.length > 0) {
+        await pool.query(
+          'UPDATE pedidos SET estado = $1 WHERE id = $2',
+          ['en_proceso', pedidoResult.rows[0].pedido_id]
+        );
       }
     }
 
@@ -272,27 +253,26 @@ router.get('/:id/avances', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const pool = getPool();
 
-    const result = await pool.request()
-      .input('ficha_id', sql.Int, id)
-      .query(`
-        SELECT 
-          apa.id,
-          apa.area,
-          apa.fecha_inicio,
-          apa.fecha_fin,
-          apa.configuracion_maquina as parametros_json,
-          apa.cantidad_procesada,
-          apa.tiempo_operacion,
-          apa.observaciones,
-          apa.estado,
-          u.nombre as operario_nombre
-        FROM AvancesPorArea apa
-        INNER JOIN Usuarios u ON apa.operario_id = u.id
-        WHERE apa.ficha_tecnica_id = @ficha_id
-        ORDER BY apa.fecha_inicio
-      `);
+    const result = await pool.query(
+      `SELECT 
+        apa.id,
+        apa.area,
+        apa.fecha_inicio,
+        apa.fecha_fin,
+        apa.configuracion_maquina as parametros_json,
+        apa.cantidad_procesada,
+        apa.tiempo_operacion,
+        apa.observaciones,
+        apa.estado,
+        u.nombre as operario_nombre
+      FROM avances_por_area apa
+      INNER JOIN usuarios u ON apa.operario_id = u.id
+      WHERE apa.ficha_tecnica_id = $1
+      ORDER BY apa.fecha_inicio`,
+      [id]
+    );
 
-    const avances = result.recordset.map(row => ({
+    const avances = result.rows.map(row => ({
       id: row.id,
       area: row.area,
       operario: row.operario_nombre,

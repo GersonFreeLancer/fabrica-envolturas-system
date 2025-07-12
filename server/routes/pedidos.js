@@ -1,5 +1,5 @@
 import express from 'express';
-import { getPool, sql } from '../config/database.js';
+import { getPool } from '../config/database.js';
 import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const pool = getPool();
-    const result = await pool.request().query(`
+    const result = await pool.query(`
       SELECT 
         p.id,
         p.descripcion,
@@ -22,12 +22,12 @@ router.get('/', authenticateToken, async (req, res) => {
         c.email as cliente_email,
         c.telefono as cliente_telefono,
         c.direccion as cliente_direccion
-      FROM Pedidos p
-      INNER JOIN Clientes c ON p.cliente_id = c.id
+      FROM pedidos p
+      INNER JOIN clientes c ON p.cliente_id = c.id
       ORDER BY p.fecha_pedido DESC
     `);
 
-    const pedidos = result.recordset.map(row => ({
+    const pedidos = result.rows.map(row => ({
       id: row.id,
       descripcion: row.descripcion,
       cantidad: row.cantidad,
@@ -57,19 +57,14 @@ router.post('/', authenticateToken, authorizeRoles('jefe_produccion'), async (re
     const { clienteId, descripcion, cantidad, fechaEntrega, especificaciones } = req.body;
 
     const pool = getPool();
-    const result = await pool.request()
-      .input('cliente_id', sql.Int, clienteId)
-      .input('descripcion', sql.VarChar, descripcion)
-      .input('cantidad', sql.Int, cantidad)
-      .input('fecha_entrega', sql.DateTime, new Date(fechaEntrega))
-      .input('especificaciones', sql.Text, especificaciones)
-      .query(`
-        INSERT INTO Pedidos (cliente_id, descripcion, cantidad, fecha_entrega, especificaciones, estado)
-        OUTPUT INSERTED.id
-        VALUES (@cliente_id, @descripcion, @cantidad, @fecha_entrega, @especificaciones, 'pendiente')
-      `);
+    const result = await pool.query(
+      `INSERT INTO pedidos (cliente_id, descripcion, cantidad, fecha_entrega, especificaciones, estado)
+       VALUES ($1, $2, $3, $4, $5, 'pendiente')
+       RETURNING id`,
+      [clienteId, descripcion, cantidad, new Date(fechaEntrega), especificaciones]
+    );
 
-    const pedidoId = result.recordset[0].id;
+    const pedidoId = result.rows[0].id;
 
     res.status(201).json({
       message: 'Pedido creado exitosamente',
@@ -89,10 +84,10 @@ router.put('/:id/estado', authenticateToken, authorizeRoles('jefe_produccion'), 
     const { estado } = req.body;
 
     const pool = getPool();
-    await pool.request()
-      .input('id', sql.Int, id)
-      .input('estado', sql.VarChar, estado)
-      .query('UPDATE Pedidos SET estado = @estado WHERE id = @id');
+    await pool.query(
+      'UPDATE pedidos SET estado = $1 WHERE id = $2',
+      [estado, id]
+    );
 
     res.json({ message: 'Estado del pedido actualizado' });
 

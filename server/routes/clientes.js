@@ -1,5 +1,5 @@
 import express from 'express';
-import { getPool, sql } from '../config/database.js';
+import { getPool } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,14 +8,14 @@ const router = express.Router();
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const pool = getPool();
-    const result = await pool.request().query(`
+    const result = await pool.query(`
       SELECT id, nombre, email, telefono, direccion, fecha_creacion
-      FROM Clientes 
-      WHERE activo = 1
+      FROM clientes 
+      WHERE activo = true
       ORDER BY nombre
     `);
 
-    res.json(result.recordset);
+    res.json(result.rows);
   } catch (error) {
     console.error('Error obteniendo clientes:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
@@ -28,20 +28,16 @@ router.post('/', authenticateToken, async (req, res) => {
     const { nombre, email, telefono, direccion } = req.body;
 
     const pool = getPool();
-    const result = await pool.request()
-      .input('nombre', sql.VarChar, nombre)
-      .input('email', sql.VarChar, email)
-      .input('telefono', sql.VarChar, telefono)
-      .input('direccion', sql.VarChar, direccion)
-      .query(`
-        INSERT INTO Clientes (nombre, email, telefono, direccion)
-        OUTPUT INSERTED.id
-        VALUES (@nombre, @email, @telefono, @direccion)
-      `);
+    const result = await pool.query(
+      `INSERT INTO clientes (nombre, email, telefono, direccion)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      [nombre, email, telefono, direccion]
+    );
 
     res.status(201).json({
       message: 'Cliente creado exitosamente',
-      clienteId: result.recordset[0].id
+      clienteId: result.rows[0].id
     });
 
   } catch (error) {

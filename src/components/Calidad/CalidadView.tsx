@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, FileText, User, Calendar, Send, Eye, Factory, Thermometer, Gauge, Zap, Scissors, Layers } from 'lucide-react';
 import { FichaTecnica } from '../../types';
 import { formatDate, formatDateTime } from '../../utils/formatters';
+import { fichasService } from '../../services/api';
 
 interface CalidadViewProps {
     fichas: FichaTecnica[];
@@ -16,6 +17,9 @@ const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdate
     const [showDetailModal, setShowDetailModal] = useState(false);
 
     const canInspect = currentUser?.rol === 'control_calidad' || currentUser?.rol === 'jefe_produccion';
+
+    // Filtrar fichas que no han sido inspeccionadas aún
+    const fichasPendientes = fichas.filter(f => !f.inspeccionCalidad);
 
     return (
         <div className="p-6 space-y-6">
@@ -39,7 +43,7 @@ const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdate
                         </div>
                         <div>
                             <p className="text-sm text-gray-600">Pendientes de Inspección</p>
-                            <p className="text-xl font-bold text-gray-900">{fichas.length}</p>
+                            <p className="text-xl font-bold text-gray-900">{fichasPendientes.length}</p>
                         </div>
                     </div>
                 </div>
@@ -51,7 +55,10 @@ const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdate
                         </div>
                         <div>
                             <p className="text-sm text-gray-600">Aprobadas Hoy</p>
-                            <p className="text-xl font-bold text-gray-900">0</p>
+                            <p className="text-xl font-bold text-gray-900">
+                                {fichas.filter(f => f.inspeccionCalidad?.resultado === 'aprobado' &&
+                                    new Date(f.inspeccionCalidad.fechaInspeccion).toDateString() === new Date().toDateString()).length}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -63,7 +70,10 @@ const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdate
                         </div>
                         <div>
                             <p className="text-sm text-gray-600">Con Observaciones</p>
-                            <p className="text-xl font-bold text-gray-900">0</p>
+                            <p className="text-xl font-bold text-gray-900">
+                                {fichas.filter(f => f.inspeccionCalidad &&
+                                    ['rechazado', 'revision'].includes(f.inspeccionCalidad.resultado)).length}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -75,14 +85,14 @@ const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdate
                     <h3 className="text-lg font-semibold text-gray-900">Fichas Pendientes de Inspección</h3>
                 </div>
 
-                {fichas.length === 0 ? (
+                {fichasPendientes.length === 0 ? (
                     <div className="text-center py-12">
                         <CheckCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                         <p className="text-gray-500">No hay fichas pendientes de inspección</p>
                     </div>
                 ) : (
                     <div className="divide-y divide-gray-200">
-                        {fichas.map((ficha) => (
+                        {fichasPendientes.map((ficha) => (
                             <div key={ficha.id} className="p-6 hover:bg-gray-50 transition-colors">
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1">
@@ -91,7 +101,7 @@ const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdate
                                                 {ficha.numeroFicha}
                                             </span>
                                             <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
-                                                Control de Calidad
+                                                Pendiente de Inspección
                                             </span>
                                         </div>
 
@@ -141,6 +151,71 @@ const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdate
                 )}
             </div>
 
+            {/* Fichas Ya Inspeccionadas */}
+            {fichas.filter(f => f.inspeccionCalidad).length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="p-6 border-b border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-900">Fichas Ya Inspeccionadas</h3>
+                    </div>
+
+                    <div className="divide-y divide-gray-200">
+                        {fichas.filter(f => f.inspeccionCalidad).map((ficha) => (
+                            <div key={ficha.id} className="p-6 hover:bg-gray-50 transition-colors">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center space-x-3 mb-2">
+                                            <span className="font-mono text-sm font-medium text-blue-600">
+                                                {ficha.numeroFicha}
+                                            </span>
+                                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${ficha.inspeccionCalidad?.resultado === 'aprobado' ? 'bg-green-100 text-green-800' :
+                                                    ficha.inspeccionCalidad?.resultado === 'rechazado' ? 'bg-red-100 text-red-800' :
+                                                        'bg-yellow-100 text-yellow-800'
+                                                }`}>
+                                                {ficha.inspeccionCalidad?.resultado === 'aprobado' ? 'Aprobado' :
+                                                    ficha.inspeccionCalidad?.resultado === 'rechazado' ? 'Rechazado' : 'Requiere Revisión'}
+                                            </span>
+                                            <span className="text-xs text-gray-500">
+                                                Inspeccionado: {formatDateTime(ficha.inspeccionCalidad?.fechaInspeccion || '')}
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                            <div>
+                                                <p className="font-medium text-gray-900">{ficha.pedido.cliente.nombre}</p>
+                                                <p className="text-gray-600">{ficha.especificaciones.tipoEnvoltura}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-600">Inspector: {ficha.inspeccionCalidad?.inspectorNombre}</p>
+                                                <p className="text-gray-600">Material: {ficha.especificaciones.material}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-gray-600">Cantidad: {ficha.especificaciones.cantidadTotal.toLocaleString()}</p>
+                                                {ficha.inspeccionCalidad?.observaciones && (
+                                                    <p className="text-gray-600 truncate">Obs: {ficha.inspeccionCalidad.observaciones}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center space-x-2 ml-4">
+                                        <button
+                                            onClick={() => {
+                                                setSelectedFicha(ficha);
+                                                setShowDetailModal(true);
+                                            }}
+                                            className="flex items-center space-x-1 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                            <span>Ver Detalles</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Modal de Detalles de Operarios */}
             {showDetailModal && selectedFicha && (
                 <OperarioDetailsModal
@@ -157,26 +232,35 @@ const CalidadView: React.FC<CalidadViewProps> = ({ fichas, currentUser, onUpdate
                 <InspectionModal
                     ficha={selectedFicha}
                     inspector={currentUser}
-                    onSave={(result) => {
+                    onSave={async (result) => {
                         console.log('Resultado de inspección:', result);
 
-                        // Si hay observaciones, crear informe
-                        if (result.resultado === 'rechazado' || result.resultado === 'revision') {
-                            if (onCreateReport) {
-                                onCreateReport(selectedFicha.id, {
-                                    tipo: 'observacion_calidad',
-                                    resultado: result.resultado,
-                                    observaciones: result.observaciones,
-                                    defectos: result.defectosEncontrados,
-                                    inspector: currentUser.nombre,
-                                    fechaInspeccion: new Date().toISOString()
-                                });
-                            }
-                        }
+                        try {
+                            // Registrar inspección en la base de datos
+                            await fichasService.registrarInspeccionCalidad(selectedFicha.id, result);
 
-                        setShowInspectionForm(false);
-                        setSelectedFicha(null);
-                        onUpdateFicha();
+                            // Si hay observaciones, crear informe
+                            if (result.resultado === 'rechazado' || result.resultado === 'revision') {
+                                if (onCreateReport) {
+                                    onCreateReport(selectedFicha.id, {
+                                        tipo: 'observacion_calidad',
+                                        resultado: result.resultado,
+                                        observaciones: result.observaciones,
+                                        defectos: result.defectosEncontrados,
+                                        inspector: currentUser.nombre,
+                                        fechaInspeccion: new Date().toISOString(),
+                                        areaObservada: result.areaObservada
+                                    });
+                                }
+                            }
+
+                            setShowInspectionForm(false);
+                            setSelectedFicha(null);
+                            onUpdateFicha();
+                        } catch (error) {
+                            console.error('Error registrando inspección:', error);
+                            alert('Error al registrar la inspección. Por favor, intenta nuevamente.');
+                        }
                     }}
                     onCancel={() => {
                         setShowInspectionForm(false);
@@ -383,6 +467,54 @@ const OperarioDetailsModal: React.FC<{
                 </div>
 
                 <div className="p-6 space-y-6">
+                    {/* Mostrar inspección de calidad si existe */}
+                    {ficha.inspeccionCalidad && (
+                        <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-500">
+                            <h4 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+                                <CheckCircle className="w-5 h-5 text-blue-600" />
+                                <span>Resultado de Inspección de Calidad</span>
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span className="font-medium text-gray-700">Resultado:</span>
+                                    <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${ficha.inspeccionCalidad.resultado === 'aprobado' ? 'bg-green-100 text-green-800' :
+                                            ficha.inspeccionCalidad.resultado === 'rechazado' ? 'bg-red-100 text-red-800' :
+                                                'bg-yellow-100 text-yellow-800'
+                                        }`}>
+                                        {ficha.inspeccionCalidad.resultado === 'aprobado' ? 'Aprobado' :
+                                            ficha.inspeccionCalidad.resultado === 'rechazado' ? 'Rechazado' : 'Requiere Revisión'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="font-medium text-gray-700">Inspector:</span>
+                                    <span className="ml-2">{ficha.inspeccionCalidad.inspectorNombre}</span>
+                                </div>
+                                <div>
+                                    <span className="font-medium text-gray-700">Fecha:</span>
+                                    <span className="ml-2">{formatDateTime(ficha.inspeccionCalidad.fechaInspeccion)}</span>
+                                </div>
+                            </div>
+                            {ficha.inspeccionCalidad.observaciones && (
+                                <div className="mt-3">
+                                    <span className="font-medium text-gray-700">Observaciones:</span>
+                                    <p className="text-gray-900 bg-white p-2 rounded border mt-1">{ficha.inspeccionCalidad.observaciones}</p>
+                                </div>
+                            )}
+                            {ficha.inspeccionCalidad.defectosEncontrados && ficha.inspeccionCalidad.defectosEncontrados.length > 0 && (
+                                <div className="mt-3">
+                                    <span className="font-medium text-gray-700">Defectos encontrados:</span>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {ficha.inspeccionCalidad.defectosEncontrados.map((defecto, index) => (
+                                            <span key={index} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+                                                {defecto}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {avancesMock.map((avance, index) => {
                         const Icon = getAreaIcon(avance.area);
                         return (
@@ -453,7 +585,7 @@ const OperarioDetailsModal: React.FC<{
     );
 };
 
-// Modal de Inspección (mantener el código existente)
+// Modal de Inspección (solo se puede usar una vez)
 const InspectionModal: React.FC<{
     ficha: FichaTecnica;
     inspector: any;
@@ -495,7 +627,8 @@ const InspectionModal: React.FC<{
             defectosEncontrados: defectos,
             areaObservada: (resultado === 'rechazado' || resultado === 'revision') ? areaObservada : null,
             fechaInspeccion: new Date().toISOString(),
-            inspectorId: inspector.id
+            inspectorId: inspector.id,
+            inspectorNombre: inspector.nombre
         });
     };
 
@@ -519,6 +652,11 @@ const InspectionModal: React.FC<{
                     <p className="text-sm text-gray-600 mt-1">
                         {ficha.pedido.cliente.nombre} - {ficha.especificaciones.tipoEnvoltura}
                     </p>
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-sm text-yellow-800">
+                            ⚠️ Esta inspección es definitiva y no se puede modificar una vez guardada.
+                        </p>
+                    </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6">
@@ -702,7 +840,7 @@ const InspectionModal: React.FC<{
                             className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
                             <Send className="w-4 h-4" />
-                            <span>Guardar Inspección</span>
+                            <span>Guardar Inspección Final</span>
                         </button>
                     </div>
                 </form>

@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { getPool, sql } from '../config/database.js';
+import { getPool } from '../config/database.js';
 
 export const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -14,15 +14,16 @@ export const authenticateToken = async (req, res, next) => {
     
     // Verificar que el usuario existe en la base de datos
     const pool = getPool();
-    const result = await pool.request()
-      .input('id', sql.Int, decoded.id)
-      .query('SELECT id, nombre, email, rol, area, activo FROM Usuarios WHERE id = @id AND activo = 1');
+    const result = await pool.query(
+      'SELECT id, nombre, email, rol, area, activo FROM usuarios WHERE id = $1 AND activo = true',
+      [decoded.id]
+    );
 
-    if (result.recordset.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Usuario no válido' });
     }
 
-    req.user = result.recordset[0];
+    req.user = result.rows[0];
     next();
   } catch (error) {
     console.error('Error en autenticación:', error);
